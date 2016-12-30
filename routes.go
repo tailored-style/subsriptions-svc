@@ -12,7 +12,11 @@ func buildRoutes() http.Handler {
 	r.HandleFunc("/", handlers.IndexHandler).
 		Methods("GET")
 
-	r.HandleFunc("/subscriptions", handlers.SubscriptionsIndexHandler)
+	r.HandleFunc("/subscriptions", handlers.SubscriptionsIndexHandler).
+		Methods("GET")
+
+	r.HandleFunc("/subscriptions", handlers.SubscriptionsCreateHandler).
+		Methods("POST")
 
 	return r
 }
