@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/tailored-style/subscriptions-svc/subscriptions"
 )
 
@@ -17,10 +18,11 @@ type outputSubscriptionList struct {
 }
 
 type outputSubscription struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Size  string `json:"size"`
-	Email string `json:"email"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Size        string `json:"size"`
+	Email       string `json:"email"`
+	StripeToken string `json:"stripeToken"`
 }
 
 func SubscriptionsIndexHandler(w http.ResponseWriter, r *http.Request) {
@@ -32,12 +34,27 @@ func SubscriptionsIndexHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := formatIndexResponse(result)
 
-	jsonBytes, err := json.Marshal(response)
+	writeJsonResponse(w, response)
+}
+
+func SubscriptionReadHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	res, err := subscriptions.FetchSubscription(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
-	fmt.Fprint(w, string(jsonBytes))
+
+	response := &outputSubscription{
+		ID:          res.ID,
+		Name:        res.Name,
+		Email:       res.Email,
+		Size:        res.Size,
+		StripeToken: res.StripeToken,
+	}
+
+	writeJsonResponse(w, response)
 }
 
 func SubscriptionsCreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -55,17 +72,17 @@ func SubscriptionsCreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (input.Name == "") {
+	if input.Name == "" {
 		http.Error(w, "Name must be provided", http.StatusBadRequest)
 		return
 	}
 
-	if (input.Email == "") {
+	if input.Email == "" {
 		http.Error(w, "Email must be provided", http.StatusBadRequest)
 		return
 	}
 
-	if (input.Size == "") {
+	if input.Size == "" {
 		http.Error(w, "Size must be provided", http.StatusBadRequest)
 		return
 	}
@@ -78,7 +95,11 @@ func SubscriptionsCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := formatCreateResponse(result)
 
-	jsonBytes, err := json.Marshal(response)
+	writeJsonResponse(w, response)
+}
+
+func writeJsonResponse(w http.ResponseWriter, marshallable interface{}) {
+	jsonBytes, err := json.Marshal(marshallable)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -93,10 +114,12 @@ func formatCreateResponse(sub *subscriptions.Subscription) *outputSubscription {
 	}
 
 	return &outputSubscription{
-		ID:    sub.ID,
-		Name:  sub.Name,
-		Email: sub.Email,
-		Size:  sub.Size}
+		ID:          sub.ID,
+		Name:        sub.Name,
+		Email:       sub.Email,
+		Size:        sub.Size,
+		StripeToken: sub.StripeToken,
+	}
 }
 
 func formatIndexResponse(result *subscriptions.FetchAllSubscriptionsResult) *outputSubscriptionList {
@@ -114,14 +137,17 @@ func formatIndexResponse(result *subscriptions.FetchAllSubscriptionsResult) *out
 	for i := 0; i < len(result.Subscriptions); i++ {
 		cur := result.Subscriptions[i]
 		subs[i] = &outputSubscription{
-			ID:    cur.ID,
-			Name:  cur.Name,
-			Size:  cur.Size,
-			Email: cur.Email}
+			ID:          cur.ID,
+			Name:        cur.Name,
+			Size:        cur.Size,
+			Email:       cur.Email,
+			StripeToken: cur.StripeToken,
+		}
 	}
 
 	return &outputSubscriptionList{
 		HasMore:       result.HasMore,
 		Subscriptions: subs,
-		LastKey:       lastKey}
+		LastKey:       lastKey,
+	}
 }

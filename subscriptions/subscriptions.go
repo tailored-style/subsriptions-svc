@@ -5,6 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/satori/go.uuid"
+	"os"
 	"time"
 )
 
@@ -19,14 +20,25 @@ func init() {
 	svc = dynamodb.New(sess)
 }
 
-const subscriptionTableName = "tailored.monthly.subscriptions"
-const subscriptionTablePrimaryKey = "ID"
+var subscriptionTableName = os.Getenv("SUBSCRIPTIONS_DYNAMODB_TABLE")
+
+const columnId = "ID"
+const columnName = "Name"
+const columnEmail = "Email"
+const columnSize = "Size"
+const columnStripeToken = "StripeToken"
+const columnSignupDate = "SignupDate"
+
+const subscriptionTablePrimaryKey = columnId
+
+const fmtSignupDate = "2006-01-02T15:04:05Z"
 
 type Subscription struct {
-	ID    string
-	Name  string
-	Size  string
-	Email string
+	ID          string
+	Name        string
+	Size        string
+	Email       string
+	StripeToken string
 }
 
 type FetchAllSubscriptionsResult struct {
@@ -40,10 +52,11 @@ func FetchAllSubscriptions(limit int, lastKey *string) (*FetchAllSubscriptionsRe
 	var input = &dynamodb.ScanInput{
 		TableName: aws.String(subscriptionTableName),
 		AttributesToGet: []*string{
-			aws.String("ID"),
-			aws.String("Name"),
-			aws.String("Size"),
-			aws.String("Email"),
+			aws.String(columnId),
+			aws.String(columnName),
+			aws.String(columnSize),
+			aws.String(columnEmail),
+			aws.String(columnStripeToken),
 		},
 		Limit: &limit64,
 	}
@@ -79,17 +92,52 @@ func FetchAllSubscriptions(limit int, lastKey *string) (*FetchAllSubscriptionsRe
 	return result, nil
 }
 
+func FetchSubscription(id string) (*Subscription, error) {
+	var key = make(map[string]*dynamodb.AttributeValue)
+	key[subscriptionTablePrimaryKey] = &dynamodb.AttributeValue{
+		S: aws.String(id)}
+
+	var input = &dynamodb.GetItemInput{
+		AttributesToGet: []*string{
+			aws.String(columnId),
+			aws.String(columnName),
+			aws.String(columnSize),
+			aws.String(columnEmail),
+			aws.String(columnStripeToken),
+		},
+		Key:       key,
+		TableName: &subscriptionTableName}
+
+	err := input.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := svc.GetItem(input)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Subscription{
+		ID:          *resp.Item[columnId].S,
+		Name:        *resp.Item[columnName].S,
+		Email:       *resp.Item[columnEmail].S,
+		Size:        *resp.Item[columnSize].S,
+		StripeToken: *resp.Item[columnStripeToken].S,
+	}, nil
+}
+
 func CreateSubscription(name string, email string, size string) (*Subscription, error) {
 	itemId := uuid.NewV4().String()
-	signupDate := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	signupDate := time.Now().UTC().Format(fmtSignupDate)
 
 	input := &dynamodb.PutItemInput{
 		Item: map[string]*dynamodb.AttributeValue{
-			"ID":    {S: &itemId},
-			"Name":  {S: &name},
-			"Email": {S: &email},
-			"Size":  {S: &size},
-			"SignupDate": {S: &signupDate},
+			columnId:         {S: &itemId},
+			columnName:       {S: &name},
+			columnEmail:      {S: &email},
+			columnSize:       {S: &size},
+			columnSignupDate: {S: &signupDate},
 		},
 		TableName: aws.String(subscriptionTableName),
 	}
@@ -102,7 +150,8 @@ func CreateSubscription(name string, email string, size string) (*Subscription, 
 		ID:    itemId,
 		Name:  name,
 		Email: email,
-		Size:  size}, nil
+		Size:  size,
+	}, nil
 }
 
 func parseSubscriptions(items []map[string]*dynamodb.AttributeValue) []*Subscription {
@@ -111,10 +160,12 @@ func parseSubscriptions(items []map[string]*dynamodb.AttributeValue) []*Subscrip
 	for i := 0; i < len(items); i++ {
 		item := items[i]
 		out[i] = &Subscription{
-			ID:    getString(item["ID"]),
-			Name:  getString(item["Name"]),
-			Size:  getString(item["Size"]),
-			Email: getString(item["Email"])}
+			ID:          getString(item[columnId]),
+			Name:        getString(item[columnName]),
+			Size:        getString(item[columnSize]),
+			Email:       getString(item[columnEmail]),
+			StripeToken: getString(item[columnStripeToken]),
+		}
 	}
 
 	return out
@@ -123,4 +174,3 @@ func parseSubscriptions(items []map[string]*dynamodb.AttributeValue) []*Subscrip
 func getString(sVal *dynamodb.AttributeValue) string {
 	return *sVal.S
 }
-

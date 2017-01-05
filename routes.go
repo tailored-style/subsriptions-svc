@@ -15,6 +15,9 @@ func buildRoutes() http.Handler {
 	r.HandleFunc("/subscriptions", handlers.SubscriptionsIndexHandler).
 		Methods("GET")
 
+	r.HandleFunc("/subscriptions/{id:[0-9a-zA-Z\\-]+}", handlers.SubscriptionReadHandler).
+		Methods("GET")
+
 	r.HandleFunc("/subscriptions", handlers.SubscriptionsCreateHandler).
 		Methods("POST")
 
