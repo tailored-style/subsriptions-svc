@@ -172,5 +172,9 @@ func parseSubscriptions(items []map[string]*dynamodb.AttributeValue) []*Subscrip
 }
 
 func getString(sVal *dynamodb.AttributeValue) string {
+	if sVal == nil {
+		return ""
+	}
+
 	return *sVal.S
 }
