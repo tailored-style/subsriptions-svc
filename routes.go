@@ -21,5 +21,10 @@ func buildRoutes() http.Handler {
 	r.HandleFunc("/subscriptions", handlers.SubscriptionsCreateHandler).
 		Methods("POST")
 
+	r.HandleFunc("/panic", func (w http.ResponseWriter, r *http.Request) {
+		panic("THROWING A PANIC")
+	}).Methods("GET")
+
 	return r
 }
+

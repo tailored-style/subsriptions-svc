@@ -118,13 +118,7 @@ func FetchSubscription(id string) (*Subscription, error) {
 		return nil, err
 	}
 
-	return &Subscription{
-		ID:          *resp.Item[columnId].S,
-		Name:        *resp.Item[columnName].S,
-		Email:       *resp.Item[columnEmail].S,
-		Size:        *resp.Item[columnSize].S,
-		StripeToken: *resp.Item[columnStripeToken].S,
-	}, nil
+	return parseSubscription(resp.Item), nil
 }
 
 func CreateSubscription(name string, email string, size string) (*Subscription, error) {
@@ -158,17 +152,20 @@ func parseSubscriptions(items []map[string]*dynamodb.AttributeValue) []*Subscrip
 	out := make([]*Subscription, len(items))
 
 	for i := 0; i < len(items); i++ {
-		item := items[i]
-		out[i] = &Subscription{
-			ID:          getString(item[columnId]),
-			Name:        getString(item[columnName]),
-			Size:        getString(item[columnSize]),
-			Email:       getString(item[columnEmail]),
-			StripeToken: getString(item[columnStripeToken]),
-		}
+		out[i] = parseSubscription(items[i])
 	}
 
 	return out
+}
+
+func parseSubscription(item map[string]*dynamodb.AttributeValue) *Subscription {
+	return &Subscription{
+		ID:          getString(item[columnId]),
+		Name:        getString(item[columnName]),
+		Size:        getString(item[columnSize]),
+		Email:       getString(item[columnEmail]),
+		StripeToken: getString(item[columnStripeToken]),
+	}
 }
 
 func getString(sVal *dynamodb.AttributeValue) string {
