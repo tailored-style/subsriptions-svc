@@ -10,6 +10,7 @@ import (
 	"github.com/codegangsta/negroni"
 
 	_ "github.com/joho/godotenv/autoload"
+	"log"
 )
 
 func main() {
@@ -35,9 +36,13 @@ func catchPanicsMiddleware(w http.ResponseWriter, r *http.Request, next http.Han
 
 	defer func() {
 		if r := recover(); r != nil {
+			stack := debug.Stack()
+
+			log.Printf("Unexpected panic: %v\n%s", r, stack)
+
 			out := &errorOutput{
 				Message: fmt.Sprintf("%v", r),
-				StackTrace: string(debug.Stack()),
+				StackTrace: string(stack),
 			}
 
 			js, err := json.Marshal(out)
